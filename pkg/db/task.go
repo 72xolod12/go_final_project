@@ -84,3 +84,20 @@ func UpdateTask(task Task) error {
 	}
 	return nil
 }
+
+
+func DeleteTask(id string) error {
+	res, err := DB.Exec("DELETE FROM scheduler WHERE id = ?", id)
+	if err != nil {
+		return err
+	}
+	
+	count, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return fmt.Errorf("задача с id %s не найдена", id)
+	}
+	return nil
+}
