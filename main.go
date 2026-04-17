@@ -15,6 +15,8 @@ import (
 	"go_final_project/pkg/db"
 )
 
+const dateFormat = "20060102"
+
 func main() {
 	// 1. Инициализация БД
 	dbFile := "scheduler.db"
