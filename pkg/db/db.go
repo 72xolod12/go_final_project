@@ -21,10 +21,11 @@ CREATE INDEX IF NOT EXISTS idx_date ON scheduler (date);
 `
 
 func Init(dbFile string) error {
+	var err error
 
-	_, err := os.Stat(dbFile)
+	_, err = os.Stat(dbFile)
 	var install bool
-	if err != nil {
+	if os.IsNotExist(err) {
 		install = true
 	}
 
@@ -36,8 +37,15 @@ func Init(dbFile string) error {
 	if install {
 		_, err = DB.Exec(schema)
 		if err != nil {
+
+			DB.Close()
 			return err
 		}
+	}
+
+	if err = DB.Ping(); err != nil {
+		DB.Close()
+		return err
 	}
 
 	return nil

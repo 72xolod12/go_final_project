@@ -11,6 +11,14 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+
+var todoPassword string
+
+
+func InitAuthConfig() {
+	todoPassword = os.Getenv("TODO_PASSWORD")
+}
+
 type AuthRequest struct {
 	Password string `json:"password"`
 }
@@ -18,17 +26,17 @@ type AuthRequest struct {
 func SigninHandler(w http.ResponseWriter, r *http.Request) {
 	var req AuthRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		SendError(w, "Ошибка формата запроса")
+		SendError(w, "Ошибка формата запроса", http.StatusBadRequest)
 		return
 	}
 
-	pass := os.Getenv("TODO_PASSWORD")
-	if req.Password != pass {
-		SendError(w, "Неверный пароль")
+	
+	if req.Password != todoPassword {
+		SendError(w, "Неверный пароль", http.StatusUnauthorized)
 		return
 	}
 
-	hash := sha256.Sum256([]byte(pass))
+	hash := sha256.Sum256([]byte(todoPassword))
 	passHash := hex.EncodeToString(hash[:])
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -36,22 +44,23 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		"exp":  time.Now().Add(time.Hour * 8).Unix(),
 	})
 
-	tokenString, err := token.SignedString([]byte(pass))
+	tokenString, err := token.SignedString([]byte(todoPassword))
 	if err != nil {
-		SendError(w, "Ошибка генерации токена")
+		SendError(w, "Ошибка генерации токена", http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 }
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		pass := os.Getenv("TODO_PASSWORD")
-		if len(pass) > 0 {
+		
+		if len(todoPassword) > 0 {
 			cookie, err := r.Cookie("token")
 			if err != nil {
-				http.Error(w, "Authentification required", http.StatusUnauthorized)
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 
@@ -59,18 +68,18 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			claims := jwt.MapClaims{}
 
 			token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-				return []byte(pass), nil
+				return []byte(todoPassword), nil
 			})
 
 			if err != nil || !token.Valid {
-				http.Error(w, "Authentification required", http.StatusUnauthorized)
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 
-			hash := sha256.Sum256([]byte(pass))
+			hash := sha256.Sum256([]byte(todoPassword))
 			expectedHash := hex.EncodeToString(hash[:])
 			if claims["hash"] != expectedHash {
-				http.Error(w, "Authentification required", http.StatusUnauthorized)
+				http.Error(w, "Authentication required", http.StatusUnauthorized)
 				return
 			}
 		}

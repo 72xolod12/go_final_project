@@ -9,14 +9,14 @@ import (
 func TaskDoneHandler(w http.ResponseWriter, r *http.Request, nextDateFunc func(time.Time, string, string) (string, error)) {
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		SendError(w, "Не указан идентификатор")
+		SendError(w, "Не указан идентификатор", http.StatusBadRequest)
 		return
 	}
 
 	
 	task, err := db.GetTask(id)
 	if err != nil {
-		SendError(w, "Задача не найдена")
+		SendError(w, "Задача не найдена", http.StatusNotFound)
 		return
 	}
 
@@ -29,7 +29,7 @@ func TaskDoneHandler(w http.ResponseWriter, r *http.Request, nextDateFunc func(t
 		now := time.Now().Truncate(24 * time.Hour)
 		next, err := nextDateFunc(now, task.Date, task.Repeat)
 		if err != nil {
-			SendError(w, "Ошибка вычисления следующей даты: "+err.Error())
+			SendError(w, "Ошибка вычисления следующей даты: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		
@@ -38,7 +38,7 @@ func TaskDoneHandler(w http.ResponseWriter, r *http.Request, nextDateFunc func(t
 	}
 
 	if err != nil {
-		SendError(w, err.Error())
+		SendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

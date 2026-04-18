@@ -8,53 +8,56 @@ import (
 	"go_final_project/pkg/db"
 )
 
-func SendError(w http.ResponseWriter, message string) {
-	resp := map[string]string{"error": message}
+func SendError(w http.ResponseWriter, message string, statusCode int) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(statusCode)
+
+	resp := map[string]string{"error": message}
 	json.NewEncoder(w).Encode(resp)
 }
 
-func AddTaskHandler(w http.ResponseWriter, r *http.Request, nextDateFunc func(time.Time, string, string) (string, error)) {
+func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 	var task db.Task
 
 	if err := json.NewDecoder(r.Body).Decode(&task); err != nil {
-		SendError(w, "Ошибка десериализации JSON")
+		SendError(w, "Ошибка десериализации JSON", http.StatusBadRequest)
 		return
 	}
 
 	if task.Title == "" {
-		SendError(w, "Не указан заголовок задачи")
+		SendError(w, "Не указан заголовок задачи", http.StatusBadRequest)
 		return
 	}
 
 	now := time.Now().Truncate(24 * time.Hour)
 	if task.Date == "" {
-		task.Date = now.Format("20060102")
+
+		task.Date = now.Format(DateFormat)
 	}
 
-	t, err := time.Parse("20060102", task.Date)
+	t, err := time.Parse(DateFormat, task.Date)
 	if err != nil {
-		SendError(w, "Дата представлена в неверном формате")
+		SendError(w, "Дата представлена в неверном формате", http.StatusBadRequest)
 		return
 	}
 
 	if t.Before(now) {
 		if task.Repeat == "" {
-			task.Date = now.Format("20060102")
-		} else {
 
-			next, err := nextDateFunc(now, task.Date, task.Repeat)
+			task.Date = now.Format(DateFormat)
+		} else {
+			next, err := NextDate(now, task.Date, task.Repeat)
 			if err != nil {
-				SendError(w, "Неверный формат правила повторения")
+				SendError(w, "Неверный формат правила повторения", http.StatusBadRequest)
 				return
 			}
 			task.Date = next
 		}
 	}
 
-	id, err := db.AddTask(task)
+	id, err := db.AddTask(&task)
 	if err != nil {
-		SendError(w, "Ошибка при добавлении задачи в БД")
+		SendError(w, "Ошибка при добавлении задачи в БД", http.StatusInternalServerError)
 		return
 	}
 
